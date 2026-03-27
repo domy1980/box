@@ -1,0 +1,6 @@
+#!/bin/bash
+REPO_ROOT="$(git rev-parse --git-common-dir | xargs dirname)"
+mkdir -p .claude/skills
+cp -r "$REPO_ROOT/.claude/skills/"* .claude/skills/
+mkdir -p current prototypes
+echo "✅ スキルをコピーしました"
