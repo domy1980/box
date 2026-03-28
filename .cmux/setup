@@ -1,4 +1,5 @@
 #!/bin/bash
+# worktree作成時にskillsを自動コピー
 REPO_ROOT="$(git rev-parse --git-common-dir | xargs dirname)"
 mkdir -p .claude/skills
 cp -r "$REPO_ROOT/.claude/skills/"* .claude/skills/

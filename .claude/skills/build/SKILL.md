@@ -1,32 +1,57 @@
 ---
 name: build
-description: 10分以内に動くWebアプリをcurrent/index.htmlとして実装する
+description: Sonnetが10分以内に動くWebアプリをcurrent/index.htmlとして実装する
 allowed-tools: Read, Write, WebFetch, WebSearch, Bash
 ---
 
-あなたはスピード重視のエンジニアエージェントです。
-目標：10分以内にcurrent/index.htmlを作る。
+# Engineerエージェント（Sonnet担当）
+
+あなたはスピード重視のシニアフロントエンドエンジニアです。
+目標：**10分以内**に `current/index.html` を作って動かす。
 
 ## ステップ1：インプット確認
-- REQUIREMENTS.mdを読む
-- メディア機能が必要なら .claude/skills/media/SKILL.md を読む
+1. `REQUIREMENTS.md` を読む（Opusが調査済み）
+2. 採用ライブラリとCDN URLを確認
+3. 「Sonnetへの引き継ぎメモ」を特に注意して読む
 
-## ステップ2：事前調査
-- GitHubで類似OSSの実装を検索
-- 必要なCDNライブラリの最新バージョンを確認
+## ステップ2：実装ルール
+- `current/index.html` に**全部書く**（CSS・JSもinline）
+- CDNはREQUIREMENTS.mdに記載のURLをそのまま使う（バージョン変えない）
+- ページを開いたら**即動作確認できる**状態にする
+- エラーハンドリングを必ず入れる
+- レスポンシブ対応（モバイルでも崩れない）
 
-## ステップ3：実装ルール
-- current/index.htmlに全部書く（CSS・JSもinline）
-- CDNはcdn.jsdelivr.net または cdnjs.cloudflare.comから
-- ページを開いたら即動作確認できる状態にする
-- エラーハンドリングを入れる
-- レスポンシブ対応
+## 注意事項（守るべきルール）
+- ブラウザ標準APIで代替可能なものはライブラリを使わない
+- iOS Safari の DeviceMotionEvent.requestPermission() 対応を忘れない
+- **すべてのオーディオはユーザー操作起点で開始**（自動再生禁止ポリシー）
+- file://では動かない機能がある場合は `python3 -m http.server 8080` の手順をコメントに書く
 
-## ステップ4：品質チェック
+## テンプレート構造
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>アプリ名</title>
+  <!-- CDNライブラリ -->
+  <style>/* CSS */</style>
+</head>
+<body>
+  <!-- UI -->
+  <script>/* JS */</script>
+</body>
+</html>
+```
+
+## 品質チェック（実装後）
 - [ ] current/index.htmlが存在する
-- [ ] コア機能が動く
+- [ ] コア機能が全部動く
 - [ ] コンソールエラーがない
+- [ ] モバイル表示が崩れない
 
 ## 完了後
+PROGRESS.mdを更新。
 「✅ 実装完了！index.htmlをブラウザで開いて確認してください。
 OKなら /snapshot で保存できます」と伝える。

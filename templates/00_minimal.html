@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <title>My App</title>
+  <style>
+    :root { --spacing: 1rem; }
+    body { max-width: 800px; margin: 0 auto; padding: var(--spacing); }
+  </style>
+</head>
+<body>
+  <main x-data="{ count: 0 }">
+    <h1>アプリタイトル</h1>
+    <p x-text="'カウント: ' + count"></p>
+    <button @click="count++">クリック</button>
+  </main>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <script>
+    // アプリコード
+    console.log('起動しました');
+  </script>
+</body>
+</html>
