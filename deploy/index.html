@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>箱男ゲーム — HAKO OTOKO</title>
+  <!--
+    起動方法: python3 -m http.server 8080
+    → http://localhost:8080/current/index.html
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/zzfx@1/ZzFX.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/howler@2/dist/howler.min.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170/build/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;overflow:hidden;font-family:'Helvetica Neue',Arial,'Hiragino Sans',sans-serif;user-select:none}
+    canvas{display:block}
+    #c3d{width:100vw;height:100vh;position:fixed;top:0;left:0}
+    #overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none}
+
+    /* ====== SCREENS ====== */
+    .screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+    .gone{display:none!important}
+
+    /* Title */
+    #s-title{background:linear-gradient(160deg,#87CEEB 0%,#B8E994 60%,#FFE082 100%)}
+    .t-box{background:rgba(255,255,255,0.88);border-radius:28px;padding:3rem 3.5rem;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.15);max-width:780px;width:94%}
+    .t-icon{font-size:8rem;margin-bottom:.5rem}
+    .t-title{font-size:clamp(5rem,13vw,8rem);font-weight:900;color:#5D4037;letter-spacing:.15em}
+    .t-sub{color:#795548;font-size:2rem;margin:.4rem 0 .8rem;font-weight:700}
+    .t-label{font-size:1.8rem;color:#777;margin-bottom:.8rem;font-weight:600}
+    .size-row{display:flex;gap:1rem;justify-content:center;margin-bottom:1.8rem}
+    .sz-btn{padding:1rem 2rem;border:3px solid #8D6E63;border-radius:14px;background:#fff;color:#5D4037;font-size:1.8rem;font-weight:700;cursor:pointer;transition:.15s}
+    .sz-btn:hover{transform:scale(1.06)}
+    .sz-btn.sel{background:#5D4037;color:#fff}
+    .go-btn{padding:1.2rem 4rem;background:#FF6B6B;color:#fff;border:none;border-radius:24px;font-size:2.2rem;font-weight:900;cursor:pointer;box-shadow:0 4px 18px rgba(255,107,107,.45);transition:.15s}
+    .go-btn:hover{transform:scale(1.06);box-shadow:0 6px 24px rgba(255,107,107,.6)}
+    .kb-note{font-size:1.3rem;color:#999;margin-top:1rem}
+
+    /* Instruction */
+    #s-instr{background:linear-gradient(160deg,#87CEEB 0%,#B8E994 60%,#FFE082 100%)}
+    .i-box{background:#fff;border-radius:22px;padding:2.5rem;max-width:860px;width:96%;box-shadow:0 8px 32px rgba(0,0,0,.15);max-height:94vh;overflow-y:auto}
+    .i-title{font-size:3rem;font-weight:900;color:#5D4037;text-align:center;margin-bottom:1.4rem}
+    .ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:1.4rem}
+    .ctrl-item{background:#F5F5F5;border-radius:14px;padding:1rem 1.2rem;text-align:center}
+    .ctrl-key{font-weight:900;font-size:2rem;color:#5D4037}
+    .ctrl-desc{font-size:1.5rem;color:#555;margin-top:.3rem}
+    .story-box{background:linear-gradient(135deg,#3d2b1a,#1a0d00);color:#f5deb3;border-radius:14px;padding:1.5rem 1.8rem;margin-bottom:1.4rem;font-size:1.6rem;line-height:2;border-left:5px solid #D2A679}
+    .story-title{font-size:1.9rem;font-weight:900;color:#FFD700;margin-bottom:.6rem;letter-spacing:.05em}
+    .story-quote{font-style:italic;color:#ffc87a;font-size:1.5rem;margin-top:.7rem;opacity:.9}
+    .rule-list{font-size:1.6rem;line-height:2.3;color:#444;margin-bottom:1.2rem}
+    .timer-bar{height:9px;background:#e0e0e0;border-radius:4px;margin-bottom:1rem;overflow:hidden}
+    .timer-fill{height:100%;background:#FF6B6B;border-radius:4px;transition:width .1s linear;width:100%}
+    .skip-btn{width:100%;padding:1.2rem;background:#5D4037;color:#fff;border:none;border-radius:16px;font-size:2rem;font-weight:700;cursor:pointer;transition:.15s}
+    .skip-btn:hover{background:#4E342E}
+
+    /* HUD */
+    #hud{pointer-events:none;z-index:5}
+    #progress-wrap{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:20px;padding:6px 16px;display:flex;align-items:center;gap:10px}
+    #pct-text{color:#fff;font-weight:700;font-size:.9rem;min-width:2.8rem}
+    #pbar{width:140px;height:11px;background:rgba(255,255,255,.25);border-radius:6px;overflow:hidden}
+    #pfill{height:100%;background:#76FF03;border-radius:6px;transition:width .4s}
+    #goal-label{color:rgba(255,255,255,.7);font-size:.78rem}
+
+    #items-wrap{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:20px;padding:8px 18px;display:flex;gap:14px;align-items:center}
+    .isl{font-size:1.5rem;opacity:.25;transition:all .3s;filter:grayscale(1)}
+    .isl.on{opacity:1;filter:none;transform:scale(1.15)}
+
+    #facing-hud{position:fixed;bottom:66px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);border-radius:12px;padding:4px 14px;color:#fff;font-size:.82rem;display:flex;align-items:center;gap:6px}
+    #facing-arrow{font-size:1.2rem}
+
+    #kb-hint{position:fixed;bottom:14px;right:14px;background:rgba(0,0,0,.5);border-radius:12px;padding:8px 12px;color:rgba(255,255,255,.65);font-size:.73rem;line-height:1.7}
+
+    #minimap-wrap{position:fixed;bottom:66px;right:14px;display:none}
+    #minimap-wrap canvas{border-radius:10px;border:2.5px solid rgba(255,255,255,.55);display:block;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+
+    #mapsize-hud{position:fixed;top:14px;right:14px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:14px;padding:5px 14px;color:#fff;font-size:.85rem;font-weight:700;display:none;z-index:5}
+
+    #star-banner{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:rgba(255,215,0,.92);color:#5D4037;padding:8px 20px 10px;border-radius:20px;font-weight:900;font-size:.95rem;display:none;z-index:6;min-width:180px;text-align:center}
+    #star-timer-bar{height:6px;background:rgba(93,64,55,.25);border-radius:3px;margin-top:6px;overflow:hidden}
+    #star-timer-fill{height:100%;background:#5D4037;border-radius:3px;transition:width 1s linear;width:100%}
+
+    #notif{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:7px 20px;border-radius:20px;font-size:.92rem;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20;white-space:nowrap}
+
+    /* Result */
+    #s-result{background:rgba(0,0,0,.88);z-index:15}
+    .r-box{background:#fff;border-radius:24px;padding:2rem;max-width:480px;width:92%;text-align:center;max-height:90vh;overflow-y:auto}
+    .r-title{font-size:2rem;font-weight:900;margin-bottom:.4rem}
+    .r-title.win{color:#FF6B6B}
+    .r-title.lose{color:#888}
+    .r-sub{color:#999;font-size:.9rem;margin-bottom:1rem}
+    .r-imgwrap{width:100%;aspect-ratio:1;background:#f0f0f0;border-radius:16px;overflow:hidden;margin-bottom:1.2rem;position:relative;display:flex;align-items:center;justify-content:center}
+    .r-imgwrap img{width:100%;height:100%;object-fit:cover}
+    .r-loading{position:absolute;color:#aaa;font-size:.9rem}
+    .r-btns{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+    .btn-save{padding:.75rem 1.8rem;background:#5D4037;color:#fff;border:none;border-radius:16px;font-size:1rem;font-weight:700;cursor:pointer;transition:.15s}
+    .btn-save:hover{background:#4E342E}
+    .btn-retry{padding:.75rem 1.8rem;background:#FF6B6B;color:#fff;border:none;border-radius:16px;font-size:1rem;font-weight:700;cursor:pointer;transition:.15s}
+    .btn-retry:hover{background:#EF5350}
+  </style>
+</head>
+<body>
+
+<!-- ====== TITLE ====== -->
+<div id="s-title" class="screen">
+  <div class="t-box">
+    <div class="t-icon">📦</div>
+    <div class="t-title">箱 男</div>
+    <div class="t-sub">HAKO OTOKO</div>
+    <div style="font-size:1.7rem;color:#6D4C41;margin:.3rem 0 1.6rem;line-height:1.9;background:rgba(93,64,55,.08);border-radius:14px;padding:1rem 1.4rem;text-align:left">
+      不透明な世の中で、あなたには<strong>小さな穴</strong>からの視界しかない。<br>
+      それでも箱を転がし、世界の90%を踏み破れ。<br>
+      <span style="font-style:italic;color:#8D6E63">— 箱に閉じこもるか、飛び出すか。</span>
+    </div>
+    <div class="t-label">マップサイズを選んでください</div>
+    <div class="size-row">
+      <button class="sz-btn sel" data-size="4">4×4<br><small>かんたん</small></button>
+      <button class="sz-btn" data-size="6">6×6<br><small>ふつう</small></button>
+      <button class="sz-btn" data-size="8">8×8<br><small>むずかしい</small></button>
+    </div>
+    <button class="go-btn" id="btn-start">はじめる！</button>
+    <div class="kb-note">キーボード操作対応（↑↓←→ / WASD + Space）</div>
+  </div>
+</div>
+
+<!-- ====== INSTRUCTION ====== -->
+<div id="s-instr" class="screen gone">
+  <div class="i-box">
+    <div class="i-title">📦 HAKO OTOKO</div>
+
+    <div class="story-box">
+      <div class="story-title">― 不透明な世の中を、箱の中から探索せよ ―</div>
+      あなたは今、段ボール箱の中にいる。<br>
+      小さな穴からしか外の世界は見えない。<br>
+      それでも、動き続けるしかない。<br>
+      アイテムを拾い、視界を広げ、世界の90%を踏破せよ。<br>
+      <div class="story-quote">「箱に閉じこもるか、箱から飛び出すか——それはあなた次第だ。」</div>
+    </div>
+
+    <div class="ctrl-grid">
+      <div class="ctrl-item"><div class="ctrl-key">↑ / W / Space</div><div class="ctrl-desc">前進</div></div>
+      <div class="ctrl-item"><div class="ctrl-key">← / A</div><div class="ctrl-desc">左を向く</div></div>
+      <div class="ctrl-item"><div class="ctrl-key">→ / D</div><div class="ctrl-desc">右を向く</div></div>
+      <div class="ctrl-item"><div class="ctrl-key">↓ / S</div><div class="ctrl-desc">後ろを向く</div></div>
+    </div>
+    <div class="rule-list">
+      🍎 リンゴ → マップサイズが分かる＋穴拡大<br>
+      🍌 バナナ → 探索率が見えるようになる<br>
+      🍊 フルーツ → 穴が広がる<br>
+      🩱 水着 → 水の中を進める<br>
+      ⭐ スター → 箱から脱出！全体が見える（10秒）<br>
+      🐦 鳥 → 地図を入手できる<br>
+      🌳 木・⛰️ 崖・🌊 水（水着なし）→ 進めない/ゲームオーバー<br>
+      🎯 90%以上探索するとクリア！
+    </div>
+    <div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div>
+    <button class="skip-btn" id="btn-skip">スキップ →</button>
+  </div>
+</div>
+
+<!-- ====== GAME ====== -->
+<canvas id="c3d"></canvas>
+<canvas id="overlay"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="screen gone" style="background:none">
+  <div id="progress-wrap">
+    <span id="pct-text">0%</span>
+    <div id="pbar"><div id="pfill" style="width:0%"></div></div>
+    <span id="goal-label">目標 90%</span>
+  </div>
+  <div id="items-wrap">
+    <span class="isl" id="sl-fruit">🍎</span>
+    <span class="isl" id="sl-swim">🩱</span>
+    <span class="isl" id="sl-star">⭐</span>
+    <span class="isl" id="sl-bird">🐦</span>
+  </div>
+  <div id="facing-hud"><span id="facing-arrow">↑</span><span id="facing-txt">北向き</span></div>
+  <div id="kb-hint">↑/W/Space: 前進<br>←/A: 左向き<br>→/D: 右向き<br>↓/S: 後ろ向き</div>
+  <div id="minimap-wrap"><canvas id="minimap" width="200" height="200"></canvas></div>
+  <div id="mapsize-hud">📍 <span id="mapsize-txt">4×4</span></div>
+  <div id="star-banner">
+    ⭐ 箱から脱出！ <span id="star-ct">10</span>秒
+    <div id="star-timer-bar"><div id="star-timer-fill"></div></div>
+  </div>
+</div>
+
+<div id="notif"></div>
+
+<!-- ====== RESULT ====== -->
+<div id="s-result" class="screen gone">
+  <div class="r-box">
+    <div class="r-title win" id="r-title">🎉 クリア！</div>
+    <div class="r-sub" id="r-sub">底面に隠れていた絵が現れた...</div>
+    <div class="r-imgwrap">
+      <div class="r-loading" id="r-loading">🎨 絵を生成中...</div>
+      <img id="r-img" src="" crossorigin="anonymous" style="display:none" alt="reward">
+    </div>
+    <div class="r-btns">
+      <button class="btn-save" id="btn-save">💾 保存</button>
+      <button class="btn-retry" id="btn-retry">もう一度</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ==========================================
+//  CONSTANTS
+// ==========================================
+const TILE  = { GROUND:0, CLIFF:1, WATER:2, TREE:3 };
+const ITEM  = { FRUIT:'fruit', APPLE:'apple', BANANA:'banana', SWIM:'swim', STAR:'star', BIRD:'bird' };
+const DIR   = { N:0, E:1, S:2, W:3 };
+const ROLL_MS = 280;
+const FACE  = { FR:0, BK:1, TP:2, BO:3, LT:4, RT:5 };
+
+// Holes are tracked per ORIGINAL face index (0-5).
+// Original faces: 0=initially-front(-Z), 1=initially-back(+Z),
+//                 2=initially-top(+Y),   3=initially-bottom(-Y),
+//                 4=initially-left(-X),  5=initially-right(+X)
+// As the cube rolls/turns, faceDir[position] = which original face is there now.
+// holeFaces = Set of original face indices that have holes.
+// Fruits add holes to: face0→face2→face4 (front/top/left originally)
+const HOLE_PROGRESSION = [0, 2, 4, 5]; // original faces that get holes in order
+
+// World look directions per facing
+const LOOK_DIR = [
+  new THREE.Vector3(0,0,-1),  // N
+  new THREE.Vector3(1,0,0),   // E
+  new THREE.Vector3(0,0,1),   // S
+  new THREE.Vector3(-1,0,0),  // W
+];
+
+// Screen offsets for each face position (relative to center, fraction of W/H)
+// Used to draw holes at the right screen position
+const FACE_SCREEN = [
+  { dx:0,    dy:0    }, // FR  → center
+  { dx:0,    dy:0    }, // BK  → center (behind, not drawn)
+  { dx:0,    dy:-0.3 }, // TP  → top
+  { dx:0,    dy:0.3  }, // BO  → bottom
+  { dx:-0.32,dy:0    }, // LT  → left
+  { dx:0.32, dy:0    }, // RT  → right
+];
+
+// ==========================================
+//  STATE
+// ==========================================
+let mapSize = 4;
+let grid    = [];
+let px = 0, pz = 0;
+let facing = DIR.N;
+let faceDir = [0,1,2,3,4,5]; // faceDir[FACE.FR] = original face currently at front position
+let holeFaces = new Set([0]); // original face 0 has a hole initially
+let holeRadius = 0.13;         // fraction of min(W,H), for the FRONT hole
+
+let hasSwim = false, hasBird = false, starActive = false;
+let fruits = 0, visitedCount = 0;
+let rolling = false;
+let gamePhase = 'title';
+
+// ==========================================
+//  THREE.JS
+// ==========================================
+const canvas3d = document.getElementById('c3d');
+const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.04);
+
+// First-person camera (FOV 75 for immersive feel)
+const cam = new THREE.PerspectiveCamera(75, 1, 0.05, 80);
+
+// Camera quaternion smoothing for turn animation
+const camQuat   = new THREE.Quaternion(); // current rendered quat
+const camTgtQ   = new THREE.Quaternion(); // target after turn
+let   camPos    = new THREE.Vector3();    // current cam position (smoothed)
+
+// Star mode: overhead cam
+let starCamPos  = new THREE.Vector3();
+let starCamTgtQ = new THREE.Quaternion();
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xfffde7, 1.2);
+sun.position.set(8, 15, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024);
+scene.add(sun);
+
+// Point light that follows player — strong enough to illuminate adjacent tiles through hole
+const playerLight = new THREE.PointLight(0xFFE4B0, 2.2, 5);
+scene.add(playerLight);
+
+addSkyDeco();
+
+// Cube mesh (hidden in play — we ARE inside it)
+const cubeGeo = new THREE.BoxGeometry(0.88, 0.88, 0.88);
+const cubeMats = [
+  new THREE.MeshLambertMaterial({color:0xD2A679}),
+  new THREE.MeshLambertMaterial({color:0xBE915B}),
+  new THREE.MeshLambertMaterial({color:0xE8C99A}),
+  new THREE.MeshLambertMaterial({color:0xA0784A}),
+  new THREE.MeshLambertMaterial({color:0xD2A679}),
+  new THREE.MeshLambertMaterial({color:0xC49560}),
+];
+const cube = new THREE.Mesh(cubeGeo, cubeMats);
+cube.castShadow = true;
+cube.position.set(0, 0.44, 0);
+scene.add(cube);
+
+const tileGroup = new THREE.Group();
+scene.add(tileGroup);
+
+const MAT = {
+  groundVis:    new THREE.MeshLambertMaterial({color:0x5DBB63}),
+  cliff:        new THREE.MeshLambertMaterial({color:0x1a1818}),  // dark void
+  water:        new THREE.MeshLambertMaterial({color:0x87CEEB, transparent:true, opacity:0.90}), // light blue
+  tree:         new THREE.MeshLambertMaterial({color:0x4a7a30}),
+  trunkMat:     new THREE.MeshLambertMaterial({color:0x7a4a1a}),
+  dark:         new THREE.MeshLambertMaterial({color:0x0d0d0d}), // truly unseen
+  // Sighted (seen through hole but not yet visited) — dimmed versions
+  sGround:  new THREE.MeshLambertMaterial({color:0x284d28}),
+  sCliff:   new THREE.MeshLambertMaterial({color:0x0d0c0c}),
+  sWater:   new THREE.MeshLambertMaterial({color:0x3a6070, transparent:true, opacity:0.85}),
+  sTree:    new THREE.MeshLambertMaterial({color:0x1a3010}),
+};
+
+let tileMeshes = [];
+
+// ==========================================
+//  OVERLAY CANVAS (peephole effect)
+// ==========================================
+const olCanvas = document.getElementById('overlay');
+const olCtx = olCanvas.getContext('2d');
+
+function resize() {
+  const W = innerWidth, H = innerHeight;
+  renderer.setSize(W, H);
+  cam.aspect = W/H;
+  cam.updateProjectionMatrix();
+  olCanvas.width  = W;
+  olCanvas.height = H;
+}
+resize();
+addEventListener('resize', resize);
+
+// ==========================================
+//  MAP GENERATION
+// ==========================================
+function makeMap(size) {
+  mapSize = size;
+  grid = [];
+  const cx = Math.floor(size/2), cz = Math.floor(size/2);
+
+  for (let z=0; z<size; z++) {
+    grid[z] = [];
+    for (let x=0; x<size; x++) {
+      grid[z][x] = { type:TILE.GROUND, item:null, visited:false, sighted:false };
+    }
+  }
+
+  // Cliffs (avoid center and neighbors)
+  const cliffChance = 0.07;
+  const edgeCliff   = 0.18;
+  for (let z=0; z<size; z++) {
+    for (let x=0; x<size; x++) {
+      if (Math.abs(x-cx)<=1 && Math.abs(z-cz)<=1) continue;
+      const isEdge = x===0||x===size-1||z===0||z===size-1;
+      if (Math.random() < (isEdge ? edgeCliff : cliffChance)) {
+        grid[z][x].type = TILE.CLIFF;
+      }
+    }
+  }
+
+  // Water
+  let wLeft = Math.floor(size*size*0.08);
+  for (let i=0; i<200 && wLeft>0; i++) {
+    const wx=rand(size), wz=rand(size);
+    const cell=grid[wz][wx];
+    if (cell.type===TILE.GROUND && !(wx===cx&&wz===cz)) {
+      cell.type = TILE.WATER; wLeft--;
+    }
+  }
+
+  // Trees (walkable obstacle)
+  let tLeft = Math.floor(size*size*0.10);
+  for (let i=0; i<200 && tLeft>0; i++) {
+    const tx=rand(size), tz=rand(size);
+    const cell=grid[tz][tx];
+    if (cell.type===TILE.GROUND && !(Math.abs(tx-cx)<=1&&Math.abs(tz-cz)<=1)) {
+      cell.type = TILE.TREE; tLeft--;
+    }
+  }
+
+  // Items
+  const items = [ITEM.APPLE,ITEM.BANANA,ITEM.FRUIT,ITEM.SWIM,ITEM.STAR,ITEM.BIRD];
+  for (const item of items) {
+    for (let i=0; i<200; i++) {
+      const ix=rand(size), iz=rand(size);
+      const cell=grid[iz][ix];
+      if (cell.type===TILE.GROUND && !(ix===cx&&iz===cz) && !cell.item) {
+        cell.item = item; break;
+      }
+    }
+  }
+
+  // Player start
+  px=cx; pz=cz;
+  grid[cz][cx].visited = true;
+  visitedCount = 1;
+
+  buildScene();
+}
+
+function rand(n) { return Math.floor(Math.random()*n); }
+
+function buildScene() {
+  // Clear old tiles
+  tileGroup.clear();
+  tileMeshes = [];
+
+  const off = mapSize/2 - 0.5;
+
+  for (let z=0; z<mapSize; z++) {
+    tileMeshes[z] = [];
+    for (let x=0; x<mapSize; x++) {
+      const cell = grid[z][x];
+      const wx = x - mapSize/2 + 0.5;
+      const wz = z - mapSize/2 + 0.5;
+
+      // Base tile platform
+      const h = cell.type===TILE.CLIFF ? 0.5 : 0.15;
+      const geo = new THREE.BoxGeometry(0.96, h, 0.96);
+      const mat = getTileMat(cell);
+      const mesh = new THREE.Mesh(geo, mat.clone());
+      mesh.receiveShadow = true;
+      mesh.position.set(wx, h/2 - 0.075, wz);
+      tileGroup.add(mesh);
+      tileMeshes[z][x] = mesh;
+
+      // Tree geometry (visible even when unvisited — tall objects peek through darkness)
+      if (cell.type === TILE.TREE) addTree(wx, wz, cell.visited);
+
+      // Item sprite
+      if (cell.item) addItemSprite(wx, wz, cell.item, x, z);
+    }
+  }
+
+  // Place cube (visible by default; hidden once play starts)
+  cube.visible = true;
+  cube.position.set(px - mapSize/2 + 0.5, 0.44, pz - mapSize/2 + 0.5);
+  cube.quaternion.identity();
+  faceDir = [0,1,2,3,4,5];
+  updateCamImmediate();
+}
+
+function getTileMat(cell) {
+  if      (cell.visited) {
+    switch(cell.type) {
+      case TILE.CLIFF: return MAT.cliff;
+      case TILE.WATER: return MAT.water;
+      default:         return MAT.groundVis;
+    }
+  } else if (cell.sighted) {
+    switch(cell.type) {
+      case TILE.CLIFF: return MAT.sCliff;
+      case TILE.WATER: return MAT.sWater;
+      case TILE.TREE:  return MAT.sTree;
+      default:         return MAT.sGround;
+    }
+  }
+  return MAT.dark;
+}
+
+function addTree(wx, wz, visited) {
+  const g = new THREE.Group();
+  // Trunk
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.09, 0.5, 8),
+    MAT.trunkMat.clone()
+  );
+  trunk.position.set(wx, 0.32, wz);
+  // Foliage (two cone layers)
+  const col = visited ? 0x2d8a2d : 0x1a4a1a; // darker if unvisited
+  const foliage1 = new THREE.Mesh(
+    new THREE.ConeGeometry(0.32, 0.55, 8),
+    new THREE.MeshLambertMaterial({color: col})
+  );
+  foliage1.position.set(wx, 0.82, wz);
+  const foliage2 = new THREE.Mesh(
+    new THREE.ConeGeometry(0.22, 0.45, 8),
+    new THREE.MeshLambertMaterial({color: col})
+  );
+  foliage2.position.set(wx, 1.12, wz);
+  tileGroup.add(trunk);
+  tileGroup.add(foliage1);
+  tileGroup.add(foliage2);
+}
+
+function addItemSprite(wx, wz, itemType, gx, gz) {
+  const emo = {fruit:'🍊',apple:'🍎',banana:'🍌',swim:'🩱',star:'⭐',bird:'🐦'}[itemType];
+  const sc = document.createElement('canvas');
+  sc.width = sc.height = 72;
+  const ctx = sc.getContext('2d');
+  ctx.font = '52px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emo, 36, 36);
+  const tex = new THREE.CanvasTexture(sc);
+  const sp  = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
+  sp.scale.set(0.58, 0.58, 1);
+  sp.position.set(wx, 0.72, wz);
+  sp.name = `item_${gx}_${gz}`;
+  tileGroup.add(sp);
+}
+
+// ==========================================
+//  CAMERA — FIRST PERSON INSIDE THE BOX
+// ==========================================
+// Eye height inside the box (slightly below center — crouched inside)
+const EYE_Y = 0.10;
+
+function quatFromDir(dir) {
+  // Return quaternion that looks in LOOK_DIR[dir]
+  const m = new THREE.Matrix4().lookAt(
+    new THREE.Vector3(0,0,0),
+    LOOK_DIR[dir],
+    new THREE.Vector3(0,1,0)
+  );
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+function updateCamImmediate() {
+  const q = quatFromDir(facing);
+  camQuat.copy(q);
+  camTgtQ.copy(q);
+  camPos.copy(cube.position).setY(cube.position.y + EYE_Y);
+  cam.position.copy(camPos);
+  cam.quaternion.copy(camQuat);
+  playerLight.position.copy(camPos);
+}
+
+function updateCam() {
+  if (starActive) {
+    // Smoothly move to overhead position
+    camPos.lerp(starCamPos, 0.06);
+    camQuat.slerp(starCamTgtQ, 0.06);
+  } else {
+    // First-person: stay inside cube, smooth position follow
+    const eyeTarget = cube.position.clone().setY(cube.position.y + EYE_Y);
+    camPos.lerp(eyeTarget, 0.25);
+    // Smooth turn rotation
+    camQuat.slerp(camTgtQ, 0.14);
+  }
+  cam.position.copy(camPos);
+  cam.quaternion.copy(camQuat);
+  playerLight.position.copy(camPos);
+}
+
+// ==========================================
+//  ROLLING ANIMATION
+// ==========================================
+// World-space move deltas for each facing direction
+const MOVE_DELTA = [
+  {dx:0,dz:-1},  // N
+  {dx:1,dz:0},   // E
+  {dx:0,dz:1},   // S
+  {dx:-1,dz:0},  // W
+];
+
+// Roll axis (world space) for each facing direction
+// Positive rotation from this axis by -PI/2 tips the cube in that direction
+const ROLL_AXES = [
+  new THREE.Vector3(1,0,0),   // N: tip forward → rotate around +X by negative angle
+  new THREE.Vector3(0,0,1),   // E: tip right → rotate around +Z by positive angle... need to check
+  new THREE.Vector3(-1,0,0),  // S
+  new THREE.Vector3(0,0,-1),  // W
+];
+
+// Face map updates when rolling in each direction
+// rollFaceMap[dir](faceDir) returns new faceDir array
+// faceDir = [FR, BK, TP, BO, LT, RT] indices of original faces
+function rollFaceMap(fd, dir) {
+  const [FR,BK,TP,BO,LT,RT] = fd;
+  switch(dir) {
+    case DIR.N: return [TP,BO,BK,FR,LT,RT]; // tip north: top→front, front→bottom, bottom→back, back→top
+    case DIR.S: return [BO,TP,FR,BK,LT,RT]; // tip south: bottom→front, front→top, top→back, back→bottom
+    case DIR.E: return [FR,BK,LT,RT,BO,TP]; // tip east: left→top, top→right, right→bottom, bottom→left
+    case DIR.W: return [FR,BK,RT,LT,TP,BO]; // tip west: right→top, top→left, left→bottom, bottom→right
+    default: return fd;
+  }
+}
+
+function tryMove() {
+  if (rolling || gamePhase !== 'play') return;
+  const {dx,dz} = MOVE_DELTA[facing];
+  const nx = px+dx, nz = pz+dz;
+
+  if (nx<0||nx>=mapSize||nz<0||nz>=mapSize) {
+    showNotif('⛔ マップの端！'); return;
+  }
+
+  const cell = grid[nz][nx];
+  if (cell.type === TILE.CLIFF) {
+    doFall(nx, nz, 'cliff'); return;
+  }
+  if (cell.type === TILE.WATER && !hasSwim) {
+    doFall(nx, nz, 'water'); return;
+  }
+  if (cell.type === TILE.TREE) {
+    sfxBump();
+    showNotif('🌳 木があって進めない！'); return;
+  }
+
+  // Normal roll
+  doRoll(nx, nz, facing);
+}
+
+function doRoll(nx, nz, dir) {
+  rolling = true;
+
+  const startPos = cube.position.clone();
+  const endPos   = new THREE.Vector3(nx - mapSize/2 + 0.5, 0.44, nz - mapSize/2 + 0.5);
+  const startQ   = cube.quaternion.clone();
+
+  // Roll quaternion
+  const axis  = ROLL_AXES[dir].clone();
+  const angle = -Math.PI / 2;
+  const rollQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+  const endQ  = rollQ.clone().multiply(startQ);
+
+  // Update face map
+  faceDir = rollFaceMap(faceDir, dir);
+  sfxRoll();
+
+  const t0 = performance.now();
+  function step(now) {
+    const t = Math.min((now - t0) / ROLL_MS, 1);
+    const e = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease in-out
+    cube.position.lerpVectors(startPos, endPos, e);
+    cube.position.y = 0.44 + Math.sin(e * Math.PI) * 0.18;
+    cube.quaternion.slerpQuaternions(startQ, endQ, e);
+    if (t < 1) { requestAnimationFrame(step); return; }
+    cube.position.copy(endPos);
+    cube.quaternion.copy(endQ);
+    rolling = false;
+    px = nx; pz = nz;
+    onLand();
+  }
+  requestAnimationFrame(step);
+}
+
+function doFall(nx, nz, reason) {
+  rolling = true;
+  sfxFall();
+  // Show cube tumbling — dramatic exit from first-person
+  cube.visible = true;
+  // Snap camera to a dramatic angled view watching the cube fall
+  const fallCamPos = cube.position.clone();
+  fallCamPos.y += 2; fallCamPos.z += 3;
+  camPos.copy(fallCamPos);
+
+  const startPos = cube.position.clone();
+  const endPos   = new THREE.Vector3(nx - mapSize/2 + 0.5, -5, nz - mapSize/2 + 0.5);
+  const t0 = performance.now();
+  function step(now) {
+    const t = Math.min((now - t0) / 800, 1);
+    cube.position.lerpVectors(startPos, endPos, t*t);
+    cube.rotation.x += 0.05;
+    cube.rotation.z += 0.04;
+    // Camera watches cube fall
+    const look = cube.position.clone();
+    camPos.lerp(fallCamPos.clone().add(new THREE.Vector3(0, -t*2, 0)), 0.04);
+    cam.position.copy(camPos);
+    cam.lookAt(look);
+    if (t < 1) { requestAnimationFrame(step); return; }
+    rolling = false;
+    endGame(false, reason);
+  }
+  requestAnimationFrame(step);
+}
+
+// ==========================================
+//  GAME LOGIC
+// ==========================================
+function onLand() {
+  const cell = grid[pz][px];
+  if (!cell.visited) {
+    cell.visited = true;
+    visitedCount++;
+    revealTile(px, pz);
+  }
+  if (cell.item) {
+    collectItem(cell.item, px, pz);
+    cell.item = null;
+    const sp = tileGroup.getObjectByName(`item_${px}_${pz}`);
+    if (sp) tileGroup.remove(sp);
+  }
+  updateHUD();
+  if (hasBird) drawMinimap();
+
+  const walkable = countWalkable();
+  if (visitedCount / walkable >= 0.90) {
+    setTimeout(() => endGame(true, ''), 400);
+  }
+}
+
+function countWalkable() {
+  let n = 0;
+  for (let z=0;z<mapSize;z++) for (let x=0;x<mapSize;x++) {
+    const t = grid[z][x].type;
+    if (t !== TILE.CLIFF && t !== TILE.TREE) n++;
+  }
+  return n;
+}
+
+function revealTile(x, z) {
+  const cell = grid[z][x];
+  const mesh = tileMeshes[z][x];
+  if (!mesh) return;
+  switch(cell.type) {
+    case TILE.GROUND: mesh.material.color.setHex(0x5DBB63); break;
+    case TILE.WATER:  mesh.material.color.setHex(0x87CEEB); break;
+    case TILE.CLIFF:  mesh.material.color.setHex(0x1a1818); break;
+    case TILE.TREE:   mesh.material.color.setHex(0x5DBB63); break;
+    default:          mesh.material.color.setHex(0x5DBB63);
+  }
+}
+
+// Mark a tile as "sighted" (seen through hole, not yet visited)
+function sightTile(x, z) {
+  const cell = grid[z][x];
+  if (cell.visited) return; // already fully revealed
+  if (cell.sighted) return; // already sighted
+  cell.sighted = true;
+  const mesh = tileMeshes[z][x];
+  if (!mesh) return;
+  switch(cell.type) {
+    case TILE.CLIFF: mesh.material.color.setHex(0x3a1c08); break;
+    case TILE.WATER: mesh.material.color.setHex(0x0d3060); break;
+    case TILE.TREE:  mesh.material.color.setHex(0x1a3010); break;
+    default:         mesh.material.color.setHex(0x284d28); break;
+  }
+}
+
+// Called every frame — sight tiles directly ahead
+function updateSightedTiles() {
+  if (gamePhase !== 'play') return;
+  const {dx,dz} = MOVE_DELTA[facing];
+  // Sight 1 tile ahead always; 2 tiles with ≥2 fruits; 3 tiles with ≥3 fruits
+  const dist = 1 + Math.min(fruits, 2);
+  for (let i = 1; i <= dist; i++) {
+    const sx = px + dx*i, sz = pz + dz*i;
+    if (sx<0||sx>=mapSize||sz<0||sz>=mapSize) break;
+    sightTile(sx, sz);
+    // Only see past solid obstacles (cliffs block sightline)
+    if (grid[sz][sx].type === TILE.CLIFF) break;
+  }
+}
+
+function collectItem(type, x, z) {
+  switch(type) {
+    case ITEM.APPLE:
+      fruits++;
+      document.getElementById('sl-fruit').classList.add('on');
+      if (fruits <= HOLE_PROGRESSION.length) holeFaces.add(HOLE_PROGRESSION[fruits - 1]);
+      if (fruits===1) holeRadius=0.18;
+      if (fruits===2) holeRadius=0.22;
+      if (fruits>=3)  holeRadius=0.26;
+      sfxFruit();
+      document.getElementById('mapsize-txt').textContent = `${mapSize}×${mapSize}`;
+      document.getElementById('mapsize-hud').style.display = 'block';
+      showNotif(`🍎 リンゴゲット！このマップは ${mapSize}×${mapSize} です！`);
+      break;
+    case ITEM.BANANA:
+      fruits++;
+      document.getElementById('sl-fruit').classList.add('on');
+      if (fruits <= HOLE_PROGRESSION.length) holeFaces.add(HOLE_PROGRESSION[fruits - 1]);
+      if (fruits===1) holeRadius=0.18;
+      if (fruits===2) holeRadius=0.22;
+      if (fruits>=3)  holeRadius=0.26;
+      sfxFruit();
+      document.getElementById('progress-wrap').style.display = 'flex';
+      showNotif('🍌 バナナゲット！探索率が見えるようになった！');
+      break;
+    case ITEM.FRUIT:
+      fruits++;
+      document.getElementById('sl-fruit').classList.add('on');
+      if (fruits <= HOLE_PROGRESSION.length) holeFaces.add(HOLE_PROGRESSION[fruits - 1]);
+      if (fruits===1) holeRadius=0.18;
+      if (fruits===2) holeRadius=0.22;
+      if (fruits>=3)  holeRadius=0.26;
+      sfxFruit();
+      showNotif(`🍊 フルーツゲット！穴が広がった！`);
+      break;
+    case ITEM.SWIM:
+      hasSwim = true;
+      document.getElementById('sl-swim').classList.add('on');
+      sfxSwim();
+      showNotif('🩱 水着ゲット！水の中を進める！');
+      break;
+    case ITEM.STAR:
+      document.getElementById('sl-star').classList.add('on');
+      sfxStar();
+      activateStar();
+      break;
+    case ITEM.BIRD:
+      hasBird = true;
+      document.getElementById('sl-bird').classList.add('on');
+      document.getElementById('minimap-wrap').style.display = 'block';
+      sfxBird();
+      showNotif('🐦 鳥ゲット！マップを入手！');
+      drawMinimap();
+      break;
+  }
+}
+
+// ==========================================
+//  SOUND EFFECTS (Howler mp3 優先 / ZzFX フォールバック)
+// ==========================================
+// mp3ファイルは assets/sounds/ に置いてください:
+//   fruit.mp3  swim.mp3  star.mp3  bird.mp3
+//   roll.mp3   bump.mp3  fall.mp3
+function zzfxFallback(v, ...args) { try { window.zzfx(v, ...args); } catch(e){} }
+
+function makeSound(file, zzfxArgs) {
+  let h = null;
+  try {
+    h = new window.Howl({ src: [`./assets/sounds/${file}`], volume: 0.8,
+      onloaderror: () => { h = null; } });
+  } catch(e) {}
+  return () => { h && h.state() === 'loaded' ? h.play() : zzfxFallback(...zzfxArgs); };
+}
+
+const sfxFruit = makeSound('fruit.mp3', [1, .05, 880, .01, .08, .22, 0, 1.6]);
+const sfxSwim  = makeSound('swim.mp3',  [1, .1, 330, .01, .18, .38, 1, .3, 0, 4]);
+const sfxStar  = makeSound('star.mp3',  [1.5, 0, 1046, .01, .3, .55, 0, 2.2]);
+const sfxBird  = makeSound('bird.mp3',  [1, 0, 1760, .01, .05, .12, 0, 2.8, 0, 12]);
+const sfxRoll  = makeSound('roll.mp3',  [.35, .15, 110, .02, .04, .09, 4, .6]);
+const sfxBump  = makeSound('bump.mp3',  [.6, .1, 160, .01, .02, .08, 3, .4]);
+const sfxFall  = makeSound('fall.mp3',  [1, .05, 440, .01, .5, .7, 4, .4]);
+
+// ==========================================
+//  BGM (Howler.js + mp3)
+// ==========================================
+let bgmGame = null, bgmResult = null;
+
+function initBGM() {
+  if (bgmGame) return;
+  bgmGame = new window.Howl({ src: ['./assets/bgm_game.mp3'],      loop: true,  volume: 0.55 });
+  bgmClear    = new window.Howl({ src: ['./assets/bgm_clear.mp3'],    loop: false, volume: 0.7  });
+  bgmGameover = new window.Howl({ src: ['./assets/bgm_gameover.mp3'], loop: false, volume: 0.7  });
+}
+
+let bgmClear = null, bgmGameover = null;
+
+function startBGM() {
+  initBGM();
+  if (!bgmGame.playing()) bgmGame.play();
+}
+
+function stopBGM(result) {
+  if (bgmGame)    { bgmGame.stop(); }
+  if (result === 'win'  && bgmClear)    bgmClear.play();
+  if (result === 'lose' && bgmGameover) bgmGameover.play();
+}
+
+let starInterval = null;
+function activateStar() {
+  starActive = true;
+  cube.visible = true; // show cube from overhead so player can see where they are
+  document.getElementById('star-banner').style.display = 'block';
+  showNotif('⭐ 箱から脱出！全体が見える！');
+
+  // Overhead camera position (above center of map)
+  starCamPos.set(0, mapSize * 2.6, 0);
+  // Look straight down
+  const m = new THREE.Matrix4().lookAt(
+    new THREE.Vector3(0,0,0),
+    new THREE.Vector3(0,-1,0.001),
+    new THREE.Vector3(0,0,-1)
+  );
+  starCamTgtQ.setFromRotationMatrix(m);
+
+  const STAR_SEC = 10;
+  let ct = STAR_SEC;
+  document.getElementById('star-ct').textContent = ct;
+  document.getElementById('star-timer-fill').style.transition = 'none';
+  document.getElementById('star-timer-fill').style.width = '100%';
+  // Small delay so transition resets before starting
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('star-timer-fill').style.transition = `width ${STAR_SEC}s linear`;
+      document.getElementById('star-timer-fill').style.width = '0%';
+    });
+  });
+  if (starInterval) clearInterval(starInterval);
+  starInterval = setInterval(() => {
+    ct--;
+    document.getElementById('star-ct').textContent = ct;
+    if (ct<=0) {
+      clearInterval(starInterval);
+      starActive = false;
+      cube.visible = false;
+      document.getElementById('star-banner').style.display = 'none';
+      updateCamImmediate();
+      showNotif('📦 箱に戻った...');
+    }
+  }, 1000);
+}
+
+function endGame(win, reason) {
+  gamePhase = 'result';
+  stopBGM(win ? 'win' : 'lose');
+  showScreen('s-result');
+  document.getElementById('hud').classList.add('gone');
+
+  const title = document.getElementById('r-title');
+  const sub   = document.getElementById('r-sub');
+  const pct   = Math.round(visitedCount / countWalkable() * 100);
+
+  if (win) {
+    title.textContent = '🎉 クリア！';
+    title.className   = 'r-title win';
+    sub.textContent   = `${pct}% 探索完了！底面に隠れていた絵が現れた...`;
+  } else {
+    const msg = reason==='cliff' ? '崖から落ちた！' : '水に落ちた！';
+    title.textContent = `💀 ${msg}`;
+    title.className   = 'r-title lose';
+    sub.textContent   = `${pct}% 探索... でもご褒美は見られるよ！`;
+  }
+
+  loadReward();
+}
+
+// ==========================================
+//  REWARD IMAGE
+// ==========================================
+const PROMPTS = [
+  "cute pixel art treasure map colorful 8bit top down view",
+  "abstract geometric pattern made of cubes vibrant colors flat design",
+  "retro game world map bright cheerful top down view",
+  "japanese landscape from above pixel art cute colorful",
+  "secret garden maze bird eye view colorful whimsical",
+  "fantasy dungeon map top view vibrant illustrated style",
+  "ocean map with islands cute pixel art treasure hunt",
+  "colorful city map from above pixel art buildings",
+];
+
+function loadReward() {
+  const prompt = PROMPTS[Math.floor(Math.random()*PROMPTS.length)];
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&seed=${Date.now()}`;
+  const img = document.getElementById('r-img');
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    document.getElementById('r-loading').style.display = 'none';
+    img.style.display = 'block';
+  };
+  img.onerror = () => {
+    document.getElementById('r-loading').textContent = '';
+    img.style.display = 'block';
+    img.src = genFallbackImg();
+  };
+  img.src = url;
+}
+
+function genFallbackImg() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const ctx = c.getContext('2d');
+  const cols = ['#FF6B6B','#FFE66D','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F8A978'];
+  for (let i=0;i<64;i++) {
+    ctx.fillStyle = cols[Math.floor(Math.random()*cols.length)];
+    ctx.fillRect(Math.floor(Math.random()*8)*64, Math.floor(Math.random()*8)*64, 64,64);
+  }
+  return c.toDataURL();
+}
+
+// ==========================================
+//  HUD
+// ==========================================
+const DIR_ARROW = ['↑(北)','→(東)','↓(南)','←(西)'];
+const DIR_LABEL = ['北向き','東向き','南向き','西向き'];
+
+function updateHUD() {
+  const walkable = countWalkable();
+  const pct = Math.round(visitedCount/walkable*100);
+  document.getElementById('pct-text').textContent = pct+'%';
+  document.getElementById('pfill').style.width = pct+'%';
+  document.getElementById('facing-arrow').textContent = DIR_ARROW[facing].split('(')[0];
+  document.getElementById('facing-txt').textContent   = DIR_LABEL[facing];
+}
+
+// ==========================================
+//  MINIMAP
+// ==========================================
+function drawMinimap() {
+  if (!hasBird) return;
+  const mc  = document.getElementById('minimap');
+  const ctx = mc.getContext('2d');
+  const cs  = mc.width / mapSize;
+  ctx.clearRect(0,0,mc.width,mc.height);
+
+  for (let z=0;z<mapSize;z++) {
+    for (let x=0;x<mapSize;x++) {
+      const cell = grid[z][x];
+      // Bird reveals hazard types even for unvisited tiles
+      let color;
+      if (!cell.visited) {
+        // Hazards are faintly hinted even unvisited
+        if      (cell.type===TILE.CLIFF) color = '#5a3010';
+        else if (cell.type===TILE.WATER) color = '#1a3a6a';
+        else if (cell.type===TILE.TREE)  color = '#1a3a1a';
+        else                             color = '#333';
+      } else {
+        if      (cell.type===TILE.CLIFF) color = '#1a1818';
+        else if (cell.type===TILE.WATER) color = '#87CEEB';
+        else if (cell.type===TILE.TREE)  color = '#2d7a2d';
+        else                             color = '#5DBB63';
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(x*cs, z*cs, cs-1, cs-1);
+
+      // Hazard icons (bird reveals)
+      if (cell.type===TILE.CLIFF && !cell.visited) {
+        ctx.fillStyle='rgba(255,80,20,0.7)';
+        ctx.fillRect(x*cs+cs*0.3, z*cs+cs*0.3, cs*0.4, cs*0.4);
+      }
+      if (cell.type===TILE.WATER && !cell.visited) {
+        ctx.fillStyle='rgba(30,144,255,0.5)';
+        ctx.fillRect(x*cs, z*cs, cs-1, cs-1);
+      }
+
+      if (cell.item) {
+        ctx.font = `${cs*0.75}px serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText({fruit:'🍊',apple:'🍎',banana:'🍌',swim:'🩱',star:'⭐',bird:'🐦'}[cell.item], x*cs+cs/2, z*cs+cs/2);
+      }
+    }
+  }
+
+  // Player triangle (points in facing direction)
+  const dirAngles = [
+    -Math.PI/2,  // N → up
+     0,          // E → right
+     Math.PI/2,  // S → down
+    -Math.PI,    // W → left
+  ];
+  const pcx = px*cs+cs/2, pcy = pz*cs+cs/2;
+  const ang = dirAngles[facing];
+  const tr  = cs*0.42;
+  ctx.fillStyle = '#FF4444';
+  ctx.beginPath();
+  ctx.moveTo(pcx + Math.cos(ang)*tr,       pcy + Math.sin(ang)*tr);
+  ctx.lineTo(pcx + Math.cos(ang+2.4)*tr*0.6, pcy + Math.sin(ang+2.4)*tr*0.6);
+  ctx.lineTo(pcx + Math.cos(ang-2.4)*tr*0.6, pcy + Math.sin(ang-2.4)*tr*0.6);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ==========================================
+//  PEEPHOLE OVERLAY  (first-person version)
+// ==========================================
+// Holes appear at screen positions matching which face they're on:
+//   Front=center, Top=top, Bottom=bottom, Left=left, Right=right, Back=hidden
+// When you turn, the hole moves off-center (you can't see forward anymore).
+
+function drawOverlay() {
+  const W = olCanvas.width, H = olCanvas.height;
+  olCtx.clearRect(0,0,W,H);
+  if (gamePhase !== 'play') return;
+
+  const R  = Math.min(W,H) * holeRadius;
+  const cx = W/2, cy = H/2;
+
+  // Always show dark overlay with center peephole
+  olCtx.fillStyle = 'rgba(5,3,1,0.97)';
+  olCtx.fillRect(0,0,W,H);
+
+  olCtx.globalCompositeOperation = 'destination-out';
+  // Main hole always at center
+  cutHole(cx, cy, R);
+  // Additional side holes from extra fruits
+  for (let fi = 1; fi < 6; fi++) {
+    if (fi === FACE.BK || fi === FACE.FR) continue;
+    if (!holeFaces.has(faceDir[fi])) continue;
+    const { dx, dy } = FACE_SCREEN[fi];
+    cutHole(cx + dx*W, cy + dy*H, R * 0.68);
+  }
+  olCtx.globalCompositeOperation = 'source-over';
+
+  // Danger / info ring around the center hole
+  const aheadType = getTileAhead();
+  if (aheadType === TILE.CLIFF) {
+    drawDangerRing(cx, cy, R, 'rgba(255,50,20,0.85)', '⛰️ 崖！');
+  } else if (aheadType === TILE.TREE) {
+    drawDangerRing(cx, cy, R, 'rgba(60,160,60,0.7)', '🌳 木！');
+  } else if (aheadType === TILE.WATER && !hasSwim) {
+    drawDangerRing(cx, cy, R, 'rgba(30,144,255,0.85)', '🌊 危険！');
+  } else if (aheadType === TILE.WATER && hasSwim) {
+    drawDangerRing(cx, cy, R, 'rgba(30,200,255,0.35)', null);
+  } else {
+    olCtx.strokeStyle = 'rgba(140,90,40,0.22)';
+    olCtx.lineWidth = 3;
+    olCtx.beginPath();
+    olCtx.arc(cx, cy, R + 2, 0, Math.PI*2);
+    olCtx.stroke();
+  }
+}
+
+function drawCardboardWall(W, H) {
+  // Warm bright cardboard interior — you're looking at the inside of your box
+  const grad = olCtx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.72);
+  grad.addColorStop(0,   'rgba(210,170,90,1)');
+  grad.addColorStop(0.55,'rgba(180,135,65,1)');
+  grad.addColorStop(1,   'rgba(130,90,35,1)');
+  olCtx.fillStyle = grad;
+  olCtx.fillRect(0,0,W,H);
+
+  // Subtle horizontal corrugation lines
+  olCtx.strokeStyle = 'rgba(90,60,20,0.12)';
+  olCtx.lineWidth = 1;
+  const lineGap = Math.round(H / 14);
+  for (let y = 0; y < H; y += lineGap) {
+    olCtx.beginPath(); olCtx.moveTo(0,y); olCtx.lineTo(W,y); olCtx.stroke();
+  }
+  // Subtle vertical lines
+  olCtx.strokeStyle = 'rgba(90,60,20,0.06)';
+  const vGap = Math.round(W / 20);
+  for (let x = 0; x < W; x += vGap) {
+    olCtx.beginPath(); olCtx.moveTo(x,0); olCtx.lineTo(x,H); olCtx.stroke();
+  }
+}
+
+function drawDangerRing(cx, cy, R, color, label) {
+  olCtx.strokeStyle = color;
+  olCtx.lineWidth = 7;
+  olCtx.shadowColor = color;
+  olCtx.shadowBlur = 16;
+  olCtx.beginPath();
+  olCtx.arc(cx, cy, R + 5, 0, Math.PI*2);
+  olCtx.stroke();
+  olCtx.shadowBlur = 0;
+  if (label) {
+    olCtx.fillStyle = color;
+    olCtx.font = `bold ${Math.round(R * 0.22)}px sans-serif`;
+    olCtx.textAlign = 'center';
+    olCtx.textBaseline = 'middle';
+    olCtx.fillText(label, cx, cy + R + 22);
+  }
+}
+
+function cutHole(cx, cy, r) {
+  const g = olCtx.createRadialGradient(cx, cy, r*0.5, cx, cy, r);
+  g.addColorStop(0,    'rgba(0,0,0,1)');
+  g.addColorStop(0.72, 'rgba(0,0,0,0.9)');
+  g.addColorStop(1,    'rgba(0,0,0,0)');
+  olCtx.fillStyle = g;
+  olCtx.beginPath();
+  olCtx.arc(cx, cy, r, 0, Math.PI*2);
+  olCtx.fill();
+}
+
+function drawBlindHints(W, H) {
+  const cx = W/2, cy = H/2;
+  for (let fi = 0; fi < 6; fi++) {
+    if (fi === FACE.BK || fi === FACE.FR) continue;
+    const origFace = faceDir[fi];
+    if (!holeFaces.has(origFace)) continue;
+    const { dx, dy } = FACE_SCREEN[fi];
+    const sx = cx + dx*W*0.62, sy = cy + dy*H*0.62;
+    const gr = olCtx.createRadialGradient(sx,sy,0, sx,sy,18);
+    gr.addColorStop(0, 'rgba(255,200,80,0.8)');
+    gr.addColorStop(1, 'rgba(255,200,80,0)');
+    olCtx.fillStyle = gr;
+    olCtx.beginPath();
+    olCtx.arc(sx, sy, 18, 0, Math.PI*2);
+    olCtx.fill();
+  }
+}
+
+function getTileAhead() {
+  const {dx,dz} = MOVE_DELTA[facing];
+  const nx = px+dx, nz = pz+dz;
+  if (nx<0||nx>=mapSize||nz<0||nz>=mapSize) return TILE.CLIFF;
+  return grid[nz][nx].type;
+}
+
+
+// ==========================================
+//  SKY DECORATIONS
+// ==========================================
+function addSkyDeco() {
+  // Sun
+  const sun2 = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2, 16, 16),
+    new THREE.MeshBasicMaterial({color:0xFFE566})
+  );
+  sun2.position.set(18, 20, -12);
+  scene.add(sun2);
+
+  // Clouds
+  for (let i=0;i<6;i++) {
+    const g = new THREE.Group();
+    for (let j=0;j<3;j++) {
+      const cloud = new THREE.Mesh(
+        new THREE.SphereGeometry(1+Math.random()*0.8, 8, 6),
+        new THREE.MeshBasicMaterial({color:0xffffff})
+      );
+      cloud.position.set(j*1.2-1.2, Math.random()*0.4, Math.random()*0.3);
+      g.add(cloud);
+    }
+    g.position.set((Math.random()-0.5)*50, 13+Math.random()*6, (Math.random()-0.5)*50);
+    scene.add(g);
+  }
+
+  // Ground plane outside map
+  const gp = new THREE.Mesh(
+    new THREE.PlaneGeometry(60,60),
+    new THREE.MeshLambertMaterial({color:0x9ACD32})
+  );
+  gp.rotation.x = -Math.PI/2;
+  gp.position.y = -0.05;
+  gp.receiveShadow = true;
+  scene.add(gp);
+}
+
+// ==========================================
+//  NOTIFICATION
+// ==========================================
+let notifTO = null;
+function showNotif(msg) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  if (notifTO) clearTimeout(notifTO);
+  notifTO = setTimeout(()=>{ el.style.opacity='0'; }, 2200);
+}
+
+// ==========================================
+//  SCREEN MANAGEMENT
+// ==========================================
+function showScreen(id) {
+  ['s-title','s-instr','s-result'].forEach(sid => {
+    document.getElementById(sid).classList.toggle('gone', sid !== id);
+  });
+}
+
+// ==========================================
+//  INPUT
+// ==========================================
+const keysDown = new Set();
+document.addEventListener('keydown', e => {
+  if (keysDown.has(e.code)) return;
+  keysDown.add(e.code);
+  if (gamePhase === 'play' && !rolling) onKey(e.code);
+  e.preventDefault();
+});
+document.addEventListener('keyup', e => keysDown.delete(e.code));
+
+function onKey(code) {
+  switch(code) {
+    case 'ArrowUp':   case 'KeyW': case 'Space': tryMove(); break;
+    case 'ArrowLeft': case 'KeyA': turn(-1); break;
+    case 'ArrowRight':case 'KeyD': turn(1); break;
+    case 'ArrowDown': case 'KeyS': turn(2); break;
+  }
+}
+
+// faceDir updates when the cube rotates in place (turning)
+// Turn right (+1): what was front→left, right→front, back→right, left→back
+function turnFaceMapRight(fd) {
+  const [FR,BK,TP,BO,LT,RT] = fd;
+  return [RT, LT, TP, BO, FR, BK];
+}
+// Turn left (-1): what was front→right, left→front, back→left, right→back
+function turnFaceMapLeft(fd) {
+  const [FR,BK,TP,BO,LT,RT] = fd;
+  return [LT, RT, TP, BO, BK, FR];
+}
+// Turn 180°
+function turnFaceMapAround(fd) {
+  const [FR,BK,TP,BO,LT,RT] = fd;
+  return [BK, FR, TP, BO, RT, LT];
+}
+
+function turn(delta) {
+  facing = ((facing + delta) % 4 + 4) % 4;
+  // Update faceDir to reflect the cube's new orientation
+  const norm = ((delta % 4) + 4) % 4;
+  if      (norm === 1) faceDir = turnFaceMapRight(faceDir);
+  else if (norm === 3) faceDir = turnFaceMapLeft(faceDir);
+  else if (norm === 2) faceDir = turnFaceMapAround(faceDir);
+  camTgtQ.copy(quatFromDir(facing));
+  updateHUD();
+}
+
+// ==========================================
+//  UI EVENTS
+// ==========================================
+document.querySelectorAll('.sz-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('sel'));
+    btn.classList.add('sel');
+    mapSize = parseInt(btn.dataset.size);
+  });
+});
+
+document.getElementById('btn-start').addEventListener('click', () => {
+  showScreen('s-instr');
+  startInstr();
+});
+
+let instrTO = null, instrIV = null;
+function startInstr() {
+  let t = 30;
+  document.getElementById('timer-fill').style.width = '100%';
+  if (instrIV) clearInterval(instrIV);
+  instrIV = setInterval(()=>{
+    t--;
+    document.getElementById('timer-fill').style.width = (t/30*100)+'%';
+    if (t<=0) { clearInterval(instrIV); startPlay(); }
+  }, 1000);
+}
+
+document.getElementById('btn-skip').addEventListener('click', ()=>{
+  if (instrIV) clearInterval(instrIV);
+  startPlay();
+});
+
+function startPlay() {
+  // Reset player state
+  facing = DIR.N;
+  faceDir   = [0,1,2,3,4,5];
+  holeFaces = new Set([HOLE_PROGRESSION[0]]); // only original face 0 has a hole at start
+  holeRadius = 0.13;
+  hasSwim = hasBird = starActive = false;
+  fruits = 0;
+  rolling = false;
+  cube.visible = false; // hidden — we are inside the box
+
+  ['sl-fruit','sl-swim','sl-star','sl-bird'].forEach(id=>
+    document.getElementById(id).classList.remove('on'));
+  document.getElementById('minimap-wrap').style.display = 'none';
+  document.getElementById('star-banner').style.display  = 'none';
+
+  showScreen('');
+  document.getElementById('hud').classList.remove('gone');
+  document.getElementById('progress-wrap').style.display = 'none'; // hidden until banana
+  document.getElementById('mapsize-hud').style.display   = 'none'; // hidden until apple
+
+  makeMap(mapSize);
+  gamePhase = 'play';
+  updateHUD();
+  startBGM();
+}
+
+document.getElementById('btn-retry').addEventListener('click', ()=>{
+  // 結果画面のBGMを停止
+  if (bgmClear)    { bgmClear.stop(); }
+  if (bgmGameover) { bgmGameover.stop(); }
+  showScreen('s-title');
+  gamePhase = 'title';
+  document.getElementById('hud').classList.add('gone');
+  document.getElementById('r-img').style.display = 'none';
+  document.getElementById('r-img').src = '';
+  document.getElementById('r-loading').style.display = 'block';
+  document.getElementById('r-loading').textContent = '🎨 絵を生成中...';
+});
+
+document.getElementById('btn-save').addEventListener('click', ()=>{
+  const img = document.getElementById('r-img');
+  try {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth||512; c.height = img.naturalHeight||512;
+    c.getContext('2d').drawImage(img,0,0);
+    const a = document.createElement('a');
+    a.download = `hakoOtoko_${Date.now()}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+  } catch(e) {
+    window.open(img.src, '_blank');
+  }
+});
+
+// ==========================================
+//  MAIN LOOP
+// ==========================================
+function drawStarOverlay() {
+  const W = olCanvas.width, H = olCanvas.height;
+  olCtx.clearRect(0,0,W,H);
+  if (!starActive) return;
+
+  // Direction compass in star (overhead) mode
+  const cx = W/2, cy = 40;
+  const dirs = ['N','E','S','W'];
+  const angles = [-Math.PI/2, 0, Math.PI/2, Math.PI];
+  const r = 26;
+
+  olCtx.fillStyle = 'rgba(0,0,0,0.55)';
+  olCtx.beginPath();
+  olCtx.arc(cx, cy, r+10, 0, Math.PI*2);
+  olCtx.fill();
+
+  for (let i=0;i<4;i++) {
+    const a = angles[i];
+    const tx = cx + Math.cos(a)*r, ty = cy + Math.sin(a)*r;
+    olCtx.fillStyle = i===facing ? '#FF6B6B' : 'rgba(255,255,255,0.5)';
+    olCtx.font = `bold ${i===facing?16:12}px sans-serif`;
+    olCtx.textAlign='center'; olCtx.textBaseline='middle';
+    olCtx.fillText(dirs[i], tx, ty);
+  }
+
+  // Arrow pointing in facing direction
+  const fa = angles[facing];
+  olCtx.strokeStyle = '#FF6B6B';
+  olCtx.lineWidth = 3;
+  olCtx.shadowColor = '#FF6B6B';
+  olCtx.shadowBlur = 8;
+  olCtx.beginPath();
+  olCtx.moveTo(cx, cy);
+  olCtx.lineTo(cx + Math.cos(fa)*r*0.7, cy + Math.sin(fa)*r*0.7);
+  olCtx.stroke();
+  olCtx.shadowBlur = 0;
+
+  // Player marker on world (project cube to overlay)
+  const cubeScreenPos = cube.position.clone().project(cam);
+  const sx = (cubeScreenPos.x*0.5+0.5)*W;
+  const sy = (-cubeScreenPos.y*0.5+0.5)*H;
+  if (sx>0&&sx<W&&sy>0&&sy<H) {
+    olCtx.fillStyle = '#FF6B6B';
+    const arrowAng = angles[facing];
+    const tr = 14;
+    olCtx.beginPath();
+    olCtx.moveTo(sx+Math.cos(arrowAng)*tr,        sy+Math.sin(arrowAng)*tr);
+    olCtx.lineTo(sx+Math.cos(arrowAng+2.4)*tr*0.5, sy+Math.sin(arrowAng+2.4)*tr*0.5);
+    olCtx.lineTo(sx+Math.cos(arrowAng-2.4)*tr*0.5, sy+Math.sin(arrowAng-2.4)*tr*0.5);
+    olCtx.closePath();
+    olCtx.fill();
+  }
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  if (gamePhase === 'play') {
+    updateCam();
+    updateSightedTiles();
+    if (starActive) drawStarOverlay();
+    else            drawOverlay();
+  } else {
+    olCtx.clearRect(0, 0, olCanvas.width, olCanvas.height);
+  }
+  renderer.render(scene, cam);
+}
+
+// Start renderer immediately so scene renders behind screens
+resize();
+updateCamImmediate();
+loop();
+</script>
+</body>
+</html>
